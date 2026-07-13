@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#12324F">
+<title>GCP Field Capture — WAF PMU 027</title>
+<style>
+  :root{
+    --navy:#12324F; --navy2:#1A4D7A; --sky:#EAF1F7; --line:#C7D5E0;
+    --ink:#22303B; --mut:#5C6E7C; --ok:#2E7D32; --warn:#B26A00; --bad:#C62828;
+    --accent:#F2A33C; --card:#FFFFFF; --bg:#F2F5F8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); font-size:16px;}
+  header{background:var(--navy); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:10;}
+  header h1{margin:0; font-size:17px; letter-spacing:.3px;}
+  header .sub{font-size:12px; opacity:.75; margin-top:2px;}
+  .pill{display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px; background:rgba(255,255,255,.15); margin-left:8px; vertical-align:middle;}
+  main{max-width:640px; margin:0 auto; padding:12px 12px 90px;}
+  .tabs{display:flex; gap:8px; margin:10px 0 14px;}
+  .tab{flex:1; text-align:center; padding:10px; border-radius:10px; background:#fff; border:1px solid var(--line); font-weight:600; color:var(--mut); cursor:pointer;}
+  .tab.active{background:var(--navy2); color:#fff; border-color:var(--navy2);}
+  section.card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px;}
+  section.card h2{margin:0 0 10px; font-size:14px; color:var(--navy2); text-transform:uppercase; letter-spacing:.6px;}
+  label{display:block; font-size:13px; font-weight:600; margin:12px 0 4px; color:var(--ink);}
+  label .req{color:var(--bad);}
+  input[type=text], textarea, select{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:9px;
+    font-size:16px; background:#fff; color:var(--ink);
+  }
+  textarea{min-height:64px; resize:vertical;}
+  .hint{font-size:12px; color:var(--mut); margin-top:3px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .seg{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;}
+  .seg button{flex:1 1 auto; min-width:90px; padding:10px 8px; border:1.5px solid var(--line); background:#fff; border-radius:9px; font-size:14px; color:var(--ink); cursor:pointer;}
+  .seg button.sel{background:var(--navy2); color:#fff; border-color:var(--navy2);}
+  .chk{display:flex; align-items:flex-start; gap:10px; padding:10px; border:1.5px solid var(--line); border-radius:9px; margin-top:8px; cursor:pointer; background:#fff;}
+  .chk.on{border-color:var(--ok); background:#EFF7EF;}
+  .chk input{width:20px; height:20px; margin-top:1px;}
+  .chk span{font-size:14px;}
+  .gpsbox{border:1.5px dashed var(--navy2); border-radius:10px; padding:12px; text-align:center; background:var(--sky);}
+  .gpsbox .coords{font-family:ui-monospace,Menlo,monospace; font-size:15px; margin:6px 0; word-break:break-all;}
+  .gpsbox .acc{font-size:13px; font-weight:700;}
+  .acc.good{color:var(--ok);} .acc.mid{color:var(--warn);} .acc.poor{color:var(--bad);}
+  .btn{display:block; width:100%; padding:13px; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer;}
+  .btn.primary{background:var(--navy2); color:#fff;}
+  .btn.accent{background:var(--accent); color:#3A2A08;}
+  .btn.ghost{background:#fff; color:var(--navy2); border:1.5px solid var(--navy2);}
+  .btn.small{padding:9px; font-size:14px; width:auto; display:inline-block;}
+  .btn:disabled{opacity:.5;}
+  .photorow{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;}
+  .photoslot{width:96px; height:96px; border:1.5px dashed var(--line); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--mut); text-align:center; position:relative; overflow:hidden; background:#fff;}
+  .photoslot img{width:100%; height:100%; object-fit:cover;}
+  .photoslot .x{position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:13px; line-height:20px; cursor:pointer;}
+  .savedbar{position:fixed; bottom:0; left:0; right:0; background:var(--navy); padding:10px 12px; display:flex; gap:10px; z-index:10;}
+  .savedbar .btn{margin:0;}
+  .entry{background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+  .entry .top{display:flex; justify-content:space-between; align-items:baseline;}
+  .entry .id{font-weight:800; font-size:16px; color:var(--navy2);}
+  .entry .meta{font-size:12px; color:var(--mut); margin-top:3px; line-height:1.5;}
+  .entry .thumbs{display:flex; gap:6px; margin-top:8px;}
+  .entry .thumbs img{width:52px; height:52px; object-fit:cover; border-radius:7px;}
+  .entry .del{background:none; border:none; color:var(--bad); font-size:12px; cursor:pointer; padding:4px 0;}
+  .count{font-size:13px; color:var(--mut); margin:6px 2px 12px;}
+  .toast{position:fixed; bottom:70px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:20px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:20;}
+  .toast.show{opacity:1;}
+  .empty{text-align:center; color:var(--mut); padding:40px 10px; font-size:14px;}
+  .offline-note{font-size:12px; color:var(--mut); text-align:center; margin-top:8px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>GCP Field Capture <span class="pill" id="netpill">checking…</span></h1>
+</header>
+<main>
+  <div class="tabs">
+    <div class="tab active" id="tabForm" onclick="showTab('form')">＋ New site</div>
+    <div class="tab" id="tabList" onclick="showTab('list')">Records <span id="recCount"></span></div>
+  </div>
+
+  <!-- ============ FORM ============ -->
+  <div id="viewForm">
+    <section class="card">
+      <h2>1 · Site identification</h2>
+      <div class="row2">
+        <div>
+          <label>GCP ID <span class="req">*</span></label>
+          <input type="text" id="gcp_id" placeholder="e.g. GCP07" autocapitalize="characters">
+        </div>
+        <div>
+          <label>Catchment <span class="req">*</span></label>
+          <select id="catchment"><option value="">—</option><option>Sigatoka</option><option>Waimanu</option></select>
+        </div>
+      </div>
+      <label>Crew members on site <span class="req">*</span> <span style="font-weight:400;color:var(--mut)">(tap all present)</span></label>
+      <div class="seg" id="seg_crew"></div>
+    </section>
+
+    <section class="card">
+      <h2>2 · Position</h2>
+      <div class="gpsbox">
+        <div class="coords" id="coords">— no fix yet —</div>
+        <div class="acc" id="acc"></div>
+        <button class="btn primary small" style="margin-top:8px" onclick="getFix()">📡 Capture GPS (stand over the nail)</button>
+        <div class="hint" id="gpshint">Averages readings for ~20 s. Aim for accuracy &lt; 5 m.</div>
+      </div>
+      <label>Moved from design point?</label>
+      <div class="seg" id="seg_moved"></div>
+      <div id="movedwrap" style="display:none">
+        <label>Distance &amp; reason</label>
+        <input type="text" id="moved_reason" placeholder="e.g. 15 m NE — design point under canopy">
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3 · Site checks — all must pass</h2>
+      <div class="chk" onclick="tog(this)"><input type="checkbox" class="ck"><span>Flat ≤ 2 cm over 1 m (checked 2 directions)</span></div>
+      <div class="chk" onclick="tog(this)"><input type="checkbox" class="ck"><span>Hard, stable surface</span></div>
+      <div class="chk" onclick="tog(this)"><input type="checkbox" class="ck"><span>Fully open to sky — no canopy / shadow</span></div>
+      <div class="chk" onclick="tog(this)"><input type="checkbox" class="ck"><span>Clear of slope breaks / flood scour</span></div>
+      <div class="hint">If any fail — relocate the point, don't mark it.</div>
+    </section>
+
+    <section class="card">
+      <h2>4 · Mark &amp; target</h2>
+      <label>Target type <span class="req">*</span></label>
+      <div class="seg" id="seg_target"></div>
+      <div id="panelwrap" style="display:none">
+        <label>Panel number</label>
+        <input type="text" id="panel_no" placeholder="from back of panel">
+      </div>
+      <label>Surface</label>
+      <div class="seg" id="seg_surface"></div>
+      <label>GCP ID painted beside mark?</label>
+      <div class="seg" id="seg_painted"></div>
+    </section>
+
+    <section class="card">
+      <h2>5 · Photos</h2>
+      <div class="photorow" id="photos">
+        <div class="photoslot" data-kind="Close-up" onclick="pickPhoto(this)">Close-up:<br>nail + centre <span class="req">*</span></div>
+        <div class="photoslot" data-kind="Context" onclick="pickPhoto(this)">Context:<br>surroundings <span class="req">*</span></div>
+        <div class="photoslot" data-kind="Extra" onclick="pickPhoto(this)">Extra<br>(optional)</div>
+      </div>
+      <input type="file" id="file" accept="image/*" capture="environment" style="display:none">
+      <label>Notes</label>
+      <textarea id="notes"></textarea>
+    </section>
+
+    <button class="btn accent" onclick="saveEntry()">✔ Save site record</button>
+    <div class="offline-note">Saved on this phone — works fully offline. Export from the Records tab when back in coverage.</div>
+  </div>
+
+  <!-- ============ LIST ============ -->
+  <div id="viewList" style="display:none">
+    <div class="count" id="countline"></div>
+    <button class="btn accent" onclick="sendPending(false)">☁ Send pending to Drive</button>
+    <div style="height:8px"></div>
+    <button class="btn primary" onclick="exportJSON()">⬇ Export ALL (JSON incl. photos)</button>
+    <div style="height:8px"></div>
+    <button class="btn ghost" onclick="exportCSV()">⬇ Export table (CSV, no photos)</button>
+    <div style="height:14px"></div>
+    <div id="entries"></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- segmented control builder ---------- */
+const SEGS = {
+  seg_crew:    {opts:["Apao Paka","Kavitesh Prakash","Solomon Chant","Jone Nawele"], multi:true},
+  seg_moved:   {opts:["No","Yes"], onset:v=>{document.getElementById('movedwrap').style.display = v==="Yes"?"block":"none";}},
+  seg_target:  {opts:["Paint (sealed)","Panel (soil/grass)"], onset:v=>{document.getElementById('panelwrap').style.display = v&&v.startsWith("Panel")?"block":"none";}},
+  seg_surface: {opts:["Road","Concrete","Gravel","Grass","Soil"]},
+  seg_painted: {opts:["Yes","No"]},
+};
+for (const [id,cfg] of Object.entries(SEGS)){
+  const el = document.getElementById(id);
+  cfg.opts.forEach(o=>{
+    const b=document.createElement('button'); b.textContent=o; b.type="button";
+    b.onclick=()=>{ if(cfg.multi){ b.classList.toggle('sel'); }
+      else { el.querySelectorAll('button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); if(cfg.onset) cfg.onset(o); } };
+    el.appendChild(b);
+  });
+}
+function segVal(id){ const s=[...document.querySelectorAll('#'+id+' button.sel')].map(b=>b.textContent); return SEGS[id].multi? s.join('; ') : (s[0]||""); }
+function tog(div){ const c=div.querySelector('input'); if(event.target!==c) c.checked=!c.checked; div.classList.toggle('on', c.checked); }
+
+/* ---------- GPS with averaging ---------- */
+let fix=null, watching=null;
+function getFix(){
+  if(!navigator.geolocation){ toast("No GPS available"); return; }
+  const samples=[]; document.getElementById('gpshint').textContent="Averaging… hold still over the nail";
+  if(watching) navigator.geolocation.clearWatch(watching);
+  watching = navigator.geolocation.watchPosition(p=>{
+    samples.push(p.coords);
+    const lat = samples.reduce((a,c)=>a+c.latitude,0)/samples.length;
+    const lon = samples.reduce((a,c)=>a+c.longitude,0)/samples.length;
+    const acc = samples[samples.length-1].accuracy;
+    fix = {lat:+lat.toFixed(6), lon:+lon.toFixed(6), acc:Math.round(acc), n:samples.length};
+    document.getElementById('coords').textContent = fix.lat+", "+fix.lon;
+    const a=document.getElementById('acc');
+    a.textContent = "±"+fix.acc+" m ("+fix.n+" readings)";
+    a.className = "acc "+(fix.acc<=5?"good":fix.acc<=12?"mid":"poor");
+    if(samples.length>=20){ navigator.geolocation.clearWatch(watching); watching=null;
+      document.getElementById('gpshint').textContent="Fix captured. Re-tap to redo."; }
+  }, e=>{ toast("GPS error: "+e.message); }, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+}
+
+/* ---------- photos: compress to ~1280px JPEG, store as dataURL ---------- */
+let currentSlot=null;
+function pickPhoto(slot){ currentSlot=slot; document.getElementById('file').click(); }
+document.getElementById('file').addEventListener('change', function(){
+  const f=this.files[0]; if(!f) return;
+  const img=new Image(); const url=URL.createObjectURL(f);
+  img.onload=()=>{
+    const max=1280, sc=Math.min(1, max/Math.max(img.width,img.height));
+    const cv=document.createElement('canvas'); cv.width=img.width*sc; cv.height=img.height*sc;
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    const data=cv.toDataURL('image/jpeg',0.75);
+    currentSlot.innerHTML='<img src="'+data+'"><button class="x" onclick="clearSlot(event,this)">✕</button>';
+    currentSlot.dataset.img=data;
+    URL.revokeObjectURL(url);
+  };
+  img.src=url; this.value="";
+});
+function clearSlot(e,btn){ e.stopPropagation(); const s=btn.parentElement;
+  const kind=s.dataset.kind; delete s.dataset.img;
+  s.innerHTML = kind==="Extra" ? "Extra<br>(optional)" : kind+":<br>"+(kind==="Close-up"?"nail + centre":"surroundings")+' <span class="req">*</span>'; }
+
+/* ---------- IndexedDB ---------- */
+let db;
+const req = indexedDB.open("gcp_capture", 1);
+req.onupgradeneeded = e => { e.target.result.createObjectStore("entries", {keyPath:"key"}); };
+req.onsuccess = e => { db=e.target.result; refreshList(); };
+req.onerror = () => toast("Storage unavailable — use paper backup");
+
+function saveEntry(){
+  const id=document.getElementById('gcp_id').value.trim();
+  const crew=segVal('seg_crew');
+  const catchm=document.getElementById('catchment').value;
+  if(!id||!crew||!catchm){ toast("GCP ID, crew and catchment are required"); return; }
+  if(!fix){ toast("Capture a GPS fix first"); return; }
+  const checks=[...document.querySelectorAll('.ck')].filter(c=>c.checked).length;
+  if(checks<4){ toast("All 4 site checks must pass"); return; }
+  const slots=[...document.querySelectorAll('.photoslot')];
+  if(!slots[0].dataset.img || !slots[1].dataset.img){ toast("Close-up and context photos are required"); return; }
+
+  const rec = {
+    key: id+"_"+Date.now(),
+    gcp_id:id, catchment:catchm, crew,
+    timestamp:new Date().toISOString(),
+    lat:fix.lat, lon:fix.lon, accuracy_m:fix.acc,
+    moved:segVal('seg_moved'), moved_reason:document.getElementById('moved_reason').value,
+    site_checks_passed:"4/4",
+    target:segVal('seg_target'), panel_no:document.getElementById('panel_no').value,
+    surface:segVal('seg_surface'), id_painted:segVal('seg_painted'),
+    notes:document.getElementById('notes').value,
+    photos: slots.filter(s=>s.dataset.img).map(s=>({kind:s.dataset.kind, img:s.dataset.img})),
+  };
+  rec.status = "pending";
+  db.transaction("entries","readwrite").objectStore("entries").put(rec).onsuccess=()=>{
+    toast("Saved: "+id+" ✔"); resetForm(); refreshList();
+    if(navigator.onLine) sendPending(true);
+  };
+}
+
+function resetForm(){
+  document.querySelectorAll('#viewForm input[type=text], #viewForm textarea').forEach(i=>i.value="");
+  document.getElementById('catchment').selectedIndex=0;
+  document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('sel'));
+  document.querySelectorAll('.ck').forEach(c=>{c.checked=false; c.closest('.chk').classList.remove('on');});
+  document.getElementById('movedwrap').style.display='none';
+  document.getElementById('panelwrap').style.display='none';
+  document.querySelectorAll('.photoslot').forEach(s=>{ delete s.dataset.img;
+    const k=s.dataset.kind;
+    s.innerHTML = k==="Extra" ? "Extra<br>(optional)" : k+":<br>"+(k==="Close-up"?"nail + centre":"surroundings")+' <span class="req">*</span>'; });
+  fix=null; document.getElementById('coords').textContent="— no fix yet —";
+  document.getElementById('acc').textContent=""; document.getElementById('gpshint').textContent="Averages readings for ~20 s. Aim for accuracy < 5 m.";
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+/* ---------- list / export ---------- */
+function allEntries(cb){
+  const out=[]; db.transaction("entries").objectStore("entries").openCursor().onsuccess=e=>{
+    const c=e.target.result; if(c){ out.push(c.value); c.continue(); } else cb(out.sort((a,b)=>b.timestamp.localeCompare(a.timestamp))); };
+}
+function refreshList(){
+  if(!db) return;
+  allEntries(list=>{
+    document.getElementById('recCount').textContent = list.length? "("+list.length+")" : "";
+    const pend=list.filter(r=>r.status!=="sent").length;
+    document.getElementById('countline').textContent = list.length+" record"+(list.length===1?"":"s")+" on this phone — "+(pend? pend+" pending upload":"all sent ✔");
+    const el=document.getElementById('entries');
+    if(!list.length){ el.innerHTML='<div class="empty">No records yet.<br>Saved sites appear here — nothing leaves this phone until you export.</div>'; return; }
+    el.innerHTML=list.map(r=>`
+      <div class="entry">
+        <div class="top"><span class="id">${r.gcp_id}</span><span style="font-size:12px;color:${r.status==='sent'?'var(--ok)':'var(--warn)'};font-weight:700">${r.status==='sent'?'✔ sent':'⏳ pending'}</span></div>
+        <div class="meta">${r.timestamp.slice(0,16).replace('T',' ')} · ${r.catchment} · ${r.lat}, ${r.lon} (±${r.accuracy_m} m) · ${r.target||"—"} on ${r.surface||"—"}</div>
+        <div class="thumbs">${r.photos.map(p=>`<img src="${p.img}">`).join("")}</div>
+        <button class="del" onclick="delEntry('${r.key}')">delete record</button>
+      </div>`).join("");
+  });
+}
+function delEntry(k){ if(!confirm("Delete this record?")) return;
+  db.transaction("entries","readwrite").objectStore("entries").delete(k).onsuccess=refreshList; }
+
+function download(name, blob){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+function exportJSON(){
+  allEntries(list=>{
+    if(!list.length){ toast("Nothing to export"); return; }
+    download("GCP_capture_"+new Date().toISOString().slice(0,10)+".json",
+      new Blob([JSON.stringify(list,null,1)],{type:"application/json"}));
+    toast("JSON exported — share the file when in coverage");
+  });
+}
+function exportCSV(){
+  allEntries(list=>{
+    if(!list.length){ toast("Nothing to export"); return; }
+    const cols=["gcp_id","catchment","crew","timestamp","lat","lon","accuracy_m","moved","moved_reason","site_checks_passed","target","panel_no","surface","id_painted","notes"];
+    const esc=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+    const csv=[cols.join(",")].concat(list.map(r=>cols.map(c=>esc(r[c])).join(","))).join("\n");
+    download("GCP_capture_"+new Date().toISOString().slice(0,10)+".csv", new Blob([csv],{type:"text/csv"}));
+    toast("CSV exported");
+  });
+}
+
+/* ---------- Drive upload via Apps Script ---------- */
+const SCRIPT_URL = "https://script.google.com/a/macros/kahutopacific.com/s/AKfycbw5wyBjzh_sj3ou5cJ2F4MrrPyPQ9Q8eivkDiZecaAuNt5cSbDhmes1kLUe87nyKTho/exec";
+
+async function uploadRecord(rec){
+  if(!SCRIPT_URL.startsWith("https")) return false;
+  try{
+    const res = await fetch(SCRIPT_URL, {method:"POST", body: JSON.stringify(rec)});
+    const out = await res.json().catch(()=>null);
+    return !!(out && out.ok);
+  }catch(e){ return false; }
+}
+
+async function sendPending(auto){
+  if(!navigator.onLine){ if(!auto) toast("No internet — records stay queued"); return; }
+  allEntries(async list=>{
+    const pending = list.filter(r=>r.status!=="sent");
+    if(!pending.length){ if(!auto) toast("Everything already sent ✔"); return; }
+    if(!auto) toast("Sending "+pending.length+"…");
+    let sent=0;
+    for(const rec of pending){
+      const ok = await uploadRecord(rec);
+      if(ok){ rec.status="sent"; rec.sent_at=new Date().toISOString();
+        await new Promise(r=>{ db.transaction("entries","readwrite").objectStore("entries").put(rec).onsuccess=r; });
+        sent++;
+      }
+    }
+    refreshList();
+    if(sent) toast(sent+" record"+(sent===1?"":"s")+" sent to Drive ✔");
+    else if(!auto) toast("Send failed — will retry when connection improves");
+  });
+}
+window.addEventListener("online", ()=>sendPending(true));
+
+/* ---------- tabs / misc ---------- */
+function showTab(t){
+  document.getElementById('viewForm').style.display = t==='form'?'block':'none';
+  document.getElementById('viewList').style.display = t==='list'?'block':'none';
+  document.getElementById('tabForm').classList.toggle('active', t==='form');
+  document.getElementById('tabList').classList.toggle('active', t==='list');
+  if(t==='list') refreshList();
+}
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+function net(){ const p=document.getElementById('netpill'); const on=navigator.onLine;
+  p.textContent = on? "online":"offline — OK"; p.style.background = on? "rgba(120,220,140,.25)":"rgba(255,255,255,.15)"; }
+window.addEventListener('online',net); window.addEventListener('offline',net); net();
+</script>
+</body>
+</html>
