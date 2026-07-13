@@ -72,7 +72,7 @@
 </head>
 <body>
 <header>
-  <h1>GCP Field Capture <span class="pill" id="netpill">checking…</span><span class="pill">v3</span></h1>
+  <h1>GCP Field Capture <span class="pill" id="netpill">checking…</span><span class="pill">v4</span></h1>
 </header>
 <main>
   <div class="tabs">
@@ -337,13 +337,28 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw5wyBjzh_sj3ou5cJ2F
 let LAST_ERR = "";
 async function uploadRecord(rec){
   if(!SCRIPT_URL.startsWith("https")){ LAST_ERR="no script URL configured"; return false; }
+  const body = JSON.stringify(rec);
+  // Attempt 1: normal fetch (lets us read the server's confirmation where the browser allows it)
   try{
-    const res = await fetch(SCRIPT_URL, {method:"POST", body: JSON.stringify(rec)});
-    if(!res.ok){ LAST_ERR="HTTP "+res.status; return false; }
-    const out = await res.json().catch(()=>null);
-    if(!(out && out.ok)){ LAST_ERR = out && out.error ? String(out.error).slice(0,120) : "unexpected server reply"; return false; }
-    LAST_ERR=""; return true;
-  }catch(e){ LAST_ERR = String(e.message||e).slice(0,120); return false; }
+    const res = await fetch(SCRIPT_URL, {method:"POST", body});
+    if(res.ok){
+      const out = await res.json().catch(()=>null);
+      if(out && out.ok){ LAST_ERR=""; return true; }
+      LAST_ERR = out && out.error ? String(out.error).slice(0,120) : "unexpected server reply";
+      return false; // server genuinely reported a problem — don't mark sent
+    }
+    LAST_ERR = "HTTP "+res.status; return false;
+  }catch(e){
+    // Safari/iOS blocks reading Apps Script's redirected response ("Load failed")
+    // even though the POST is delivered. Fall back to fire-and-forget; the server
+    // dedupes by record key, so repeats are harmless.
+    try{
+      await fetch(SCRIPT_URL, {method:"POST", body, mode:"no-cors"});
+      LAST_ERR=""; return true;
+    }catch(e2){
+      LAST_ERR = String(e2.message||e2).slice(0,120); return false;
+    }
+  }
 }
 
 async function sendPending(auto){
