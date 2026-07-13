@@ -72,7 +72,7 @@
 </head>
 <body>
 <header>
-  <h1>GCP Field Capture <span class="pill" id="netpill">checking…</span></h1>
+  <h1>GCP Field Capture <span class="pill" id="netpill">checking…</span><span class="pill">v3</span></h1>
 </header>
 <main>
   <div class="tabs">
@@ -334,13 +334,16 @@ function exportCSV(){
 /* ---------- Drive upload via Apps Script ---------- */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw5wyBjzh_sj3ou5cJ2F4MrrPyPQ9Q8eivkDiZecaAuNt5cSbDhmes1kLUe87nyKTho/exec";
 
+let LAST_ERR = "";
 async function uploadRecord(rec){
-  if(!SCRIPT_URL.startsWith("https")) return false;
+  if(!SCRIPT_URL.startsWith("https")){ LAST_ERR="no script URL configured"; return false; }
   try{
     const res = await fetch(SCRIPT_URL, {method:"POST", body: JSON.stringify(rec)});
+    if(!res.ok){ LAST_ERR="HTTP "+res.status; return false; }
     const out = await res.json().catch(()=>null);
-    return !!(out && out.ok);
-  }catch(e){ return false; }
+    if(!(out && out.ok)){ LAST_ERR = out && out.error ? String(out.error).slice(0,120) : "unexpected server reply"; return false; }
+    LAST_ERR=""; return true;
+  }catch(e){ LAST_ERR = String(e.message||e).slice(0,120); return false; }
 }
 
 async function sendPending(auto){
@@ -359,7 +362,7 @@ async function sendPending(auto){
     }
     refreshList();
     if(sent) toast(sent+" record"+(sent===1?"":"s")+" sent to Drive ✔");
-    else if(!auto) toast("Send failed — will retry when connection improves");
+    else if(!auto) toast("Send failed: " + (LAST_ERR||"unknown") );
   });
 }
 window.addEventListener("online", ()=>sendPending(true));
